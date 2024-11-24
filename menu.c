@@ -22,7 +22,7 @@ void init_menu(void) {
 
 // Actualizar menú
 void update_menu(void) {
-    // Por ahora vacío, para futuras animaciones o actualizaciones
+    // aqui anicomaciones o actualizaciones depsues
 }
 
 void render_menu(void) {
@@ -37,11 +37,11 @@ void render_menu(void) {
     
     // Título del juego
     glColor3f(0.0f, 0.7f, 1.0f); // Azul claro para título
-    float title_length = (float)glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)"MI JUEGO RPG");
+    float title_length = (float)glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)"JUEGO DE LA AVIONETA SIDERAL");
     float title_scale = 1000.0f;
     float title_x = -title_length / title_scale;
     glRasterPos2f(title_x, game_menu.title_pos_y);
-    const char* title = "MI JUEGO RPG";
+    const char* title = "JUEGO DE LA AVIONETA SIDERAL";
     while (*title) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *title++);
     }
@@ -114,7 +114,6 @@ void menu_handle_input(unsigned char key) {
 }
 
 // Manejar teclas especiales
-// También necesitamos ajustar menu_handle_special_keys para permitir la navegación hasta la última opción
 void menu_handle_special_keys(int key) {
     switch(key) {
         case GLUT_KEY_UP:

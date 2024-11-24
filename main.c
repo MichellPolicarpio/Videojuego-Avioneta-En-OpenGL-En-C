@@ -1,9 +1,13 @@
 #include "config.h"
 #include "menu.h"
+#include "player.h"
+#include "obstacle.h" 
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h> 
 
-// gcc -Wall -framework OpenGL -framework GLUT menu.c main.c -o main
+
+// gcc -Wall -framework OpenGL -framework GLUT menu.c player.c obstacle.c main.c -o game
 
 // Constantes
 #define WINDOW_WIDTH 800
@@ -18,6 +22,8 @@ bool running = true;
 float delta_time = 0.0f;
 int last_time = 0;
 
+int score = 0;  // Variable para almacenar la puntuación
+
 // Prototipos de funciones
 void init(void);
 void display(void);
@@ -27,9 +33,13 @@ void keyboard(unsigned char key, int x, int y);
 void special_keys(int key, int x, int y);
 void cleanup(void);
 void timer(int value);
+void render_game(void);
+void keyboard_up(unsigned char key, int x, int y);
 
 // Función de inicialización
 void init(void) {
+    init_obstacles();
+
     // Configurar color de fondo
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     
@@ -48,8 +58,9 @@ void init(void) {
     // Inicializar tiempo
     last_time = glutGet(GLUT_ELAPSED_TIME);
     
-    // Inicializar menú
+    // Inicializar menú y jugador
     init_menu();
+    init_player();
 }
 
 // Función de actualización
@@ -58,20 +69,59 @@ void update(void) {
     int current_time = glutGet(GLUT_ELAPSED_TIME);
     delta_time = (current_time - last_time) / 1000.0f;
     last_time = current_time;
-    
+
+    // Incrementar la puntuación
+    if (current_state == STATE_PLAYING) {
+        score += (int)(delta_time * 10);  // Incrementa 10 puntos por segundo
+    }
+
     // Actualizar según el estado
     switch(current_state) {
         case STATE_MENU:
             update_menu();
             break;
-            
+
         case STATE_PLAYING:
-            // TODO: Actualizar juego
+            update_player(delta_time);
+            update_obstacles(delta_time);
+            // Verificar colisiones
+            if (check_collision(0.0f, player.y_pos, 2.0f)) {
+                printf("¡Colisión detectada!\n");
+                // TODO: Manejar colisión
+            }
             break;
-            
+
         case STATE_PAUSED:
-            // TODO: Actualizar pausa
+            // No actualizar durante pausa
             break;
+    }
+}
+
+// Función para renderizar el juego
+void render_game(void) {
+    glLoadIdentity();
+
+    // Cambiar la vista para que mire desde el lado
+    gluLookAt(0.0f, 0.0f, 70.0f,    // Posición de la cámara (ahora en Z)
+              20.0f, 0.0f, 0.0f,      // Punto al que mira (centro)
+              0.0f, 1.0f, 0.0f);     // Vector "arriba"
+
+    // Renderizar obstáculos
+    render_obstacles();
+
+    // Renderizar avioneta
+    render_player();
+
+    // Renderizar puntuación
+    glColor3f(1.0f, 1.0f, 1.0f); // Color blanco para el texto
+    char score_text[20];
+    sprintf(score_text, "Score: %d", score);
+    float text_length = (float)glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)score_text);
+    glRasterPos2f(-15.0f + text_length / 2000.0f, 20.1f); // Ajusta aquí para mover el texto más arriba
+
+    const char* text = score_text;
+    while (*text) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text++);
     }
 }
 
@@ -87,19 +137,14 @@ void display(void) {
             break;
             
         case STATE_PLAYING:
-            // TODO: Renderizar juego
-            glTranslatef(0.0f, 0.0f, -5.0f);
-            glColor3f(0.0f, 1.0f, 0.0f);
-            glutWireCube(1.0f);  // Cubo temporal para prpbar que cargue opcion del juego
+            render_game();
             break;
             
         case STATE_PAUSED:
-            // Primero renderizar el juego pausado
-            glTranslatef(0.0f, 0.0f, -5.0f);
-            glColor3f(0.0f, 1.0f, 0.0f);
-            glutWireCube(1.0f);
+            // Renderizar el juego pausado
+            render_game();
             
-            // Luego renderizar el texto de pausa
+            // Superponer texto de pausa
             glMatrixMode(GL_PROJECTION);
             glPushMatrix();
             glLoadIdentity();
@@ -108,7 +153,15 @@ void display(void) {
             glLoadIdentity();
             
             glColor3f(1.0f, 1.0f, 1.0f);
-            //AQUI IBA ALGO DE PAUSED
+            const char* pause_text = "PAUSED";
+            float text_length = (float)glutBitmapLength(GLUT_BITMAP_HELVETICA_18, 
+                                                      (const unsigned char*)pause_text);
+            float scale = 1000.0f;
+            float x = -text_length / scale;
+            glRasterPos2f(x, 0.0f);
+            while (*pause_text) {
+                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *pause_text++);
+            }
             
             glMatrixMode(GL_PROJECTION);
             glPopMatrix();
@@ -141,30 +194,10 @@ void keyboard(unsigned char key, int x, int y) {
             break;
             
         case STATE_PLAYING:
-            switch(key) {
-                case 27: // ESC
-                    current_state = STATE_PAUSED;
-                    break;
-                    
-                case 'w':
-                case 'W':
-                    // TODO: Mover adelante
-                    break;
-                    
-                case 's':
-                case 'S':
-                    // TODO: Mover atrás
-                    break;
-                    
-                case 'a':
-                case 'A':
-                    // TODO: Mover izquierda
-                    break;
-                    
-                case 'd':
-                case 'D':
-                    // TODO: Mover derecha
-                    break;
+            if(key == 27) { // ESC
+                current_state = STATE_PAUSED;
+            } else {
+                handle_player_input(key);
             }
             break;
             
@@ -188,16 +221,10 @@ void special_keys(int key, int x, int y) {
         case STATE_PLAYING:
             switch(key) {
                 case GLUT_KEY_UP:
-                    // TODO: Mover adelante
+                    handle_player_input('w');
                     break;
                 case GLUT_KEY_DOWN:
-                    // TODO: Mover atrás
-                    break;
-                case GLUT_KEY_LEFT:
-                    // TODO: Girar izquierda
-                    break;
-                case GLUT_KEY_RIGHT:
-                    // TODO: Girar derecha
+                    handle_player_input('s');
                     break;
             }
             break;
@@ -206,6 +233,8 @@ void special_keys(int key, int x, int y) {
             // No procesar teclas especiales en pausa
             break;
     }
+    
+    glutPostRedisplay();
 }
 
 // Función de timer para FPS constantes
@@ -219,6 +248,14 @@ void timer(int value) {
 void cleanup(void) {
     printf("Limpiando recursos...\n");
     // TODO: Liberar recursos
+}
+
+// Implementar la función
+void keyboard_up(unsigned char key, int x, int y) {
+    if(current_state == STATE_PLAYING) {
+        handle_player_key_up(key);
+    }
+    glutPostRedisplay();
 }
 
 // Función principal
@@ -241,6 +278,9 @@ int main(int argc, char** argv) {
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(special_keys);
     glutTimerFunc(0, timer, 0);
+
+    glutKeyboardFunc(keyboard);
+    glutKeyboardUpFunc(keyboard_up);  // Añadir esta línea
     
     // Mensaje de inicio
     printf("Iniciando juego...\n");
