@@ -20,6 +20,75 @@ static float PROPELLER_WIDTH = 0.2f;
 static float PROPELLER_HEIGHT = 4.0f;
 static float PROPELLER_HUB_RADIUS = 0.4f;
 
+
+// Inicializar las partículas
+void init_trail(void) {
+    player.trail_count = 0;
+}
+
+// Actualizar las partículas de la estela
+void update_trail(float delta_time) {
+    // Mover partículas existentes
+    for(int i = 0; i < player.trail_count; i++) {
+        player.trail[i].alpha -= delta_time * 2.0f;  // Desvanecer
+        player.trail[i].x -= player.current_speed * delta_time;  // Mover hacia atrás
+        player.trail[i].size += delta_time * 2.0f;  // Aumentar tamaño
+    }
+
+    // Eliminar partículas desvanecidas
+    for(int i = 0; i < player.trail_count; i++) {
+        if(player.trail[i].alpha <= 0) {
+            // Mover última partícula a esta posición
+            if(i < player.trail_count - 1) {
+                player.trail[i] = player.trail[player.trail_count - 1];
+                i--;  // Revisar esta posición de nuevo
+            }
+            player.trail_count--;
+        }
+    }
+
+    // Añadir nueva partícula si estamos en boost
+    if(player.current_speed > player.normal_speed && 
+       player.trail_count < MAX_TRAIL_PARTICLES) {
+        TrailParticle new_particle = {
+            .x = 0,
+            .y = player.y_pos,
+            .alpha = 1.0f,
+            .size = 1.0f
+        };
+        player.trail[player.trail_count++] = new_particle;
+    }
+}
+
+// Renderizar la estela
+void render_trail(void) {
+    glPushMatrix();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    for(int i = 0; i < player.trail_count; i++) {
+        glColor4f(1.0f, 0.5f, 0.0f, player.trail[i].alpha);  // Naranja con transparencia
+        
+        glPushMatrix();
+        glTranslatef(player.trail[i].x, player.trail[i].y, 0.0f);
+        glScalef(player.trail[i].size, player.trail[i].size, 1.0f);
+        
+        // Dibujar partícula como un cuadrado o círculo
+        glBegin(GL_QUADS);
+        float size = 0.5f;
+        glVertex3f(-size, -size, 0.0f);
+        glVertex3f( size, -size, 0.0f);
+        glVertex3f( size,  size, 0.0f);
+        glVertex3f(-size,  size, 0.0f);
+        glEnd();
+        
+        glPopMatrix();
+    }
+    
+    glDisable(GL_BLEND);
+    glPopMatrix();
+}
+
 // Funciones auxiliares de dibujo
 static void drawScaledCube(float width, float height, float length) {
     glPushMatrix();
@@ -30,7 +99,7 @@ static void drawScaledCube(float width, float height, float length) {
 
 static void drawWing() {
     glPushMatrix();
-        glColor3f(0.6f, 0.6f, 0.6f);
+        glColor3f(1.0f, 1.0f, 0.0f); // Amarillo
         glRotatef(WING_ANGLE, 0.0f, 0.0f, 0.0f);
         
         // Parte central del ala
@@ -55,7 +124,7 @@ static void drawWing() {
 static void drawPropeller() {
     glPushMatrix();
         // Hub de la hélice
-        glColor3f(0.3f, 0.3f, 0.3f);
+        glColor3f(1.0f, 1.0f, 0.0f); // Amarillo
         GLUquadric *quadric = gluNewQuadric();
         gluQuadricDrawStyle(quadric, GLU_FILL);
         gluCylinder(quadric, PROPELLER_HUB_RADIUS, PROPELLER_HUB_RADIUS, 0.5f, 20, 1);
@@ -81,6 +150,8 @@ static void drawPropeller() {
 }
 
 void init_player(void) {
+    init_trail();
+
     player.y_pos = 0.0f;
     player.y_velocity = 0.0f;
     player.normal_speed = 30.0f;     // Velocidad normal base
@@ -94,6 +165,8 @@ void init_player(void) {
 }
 
 void update_player(float delta_time) {
+    update_trail(delta_time);
+
     // Actualizar posición vertical
     player.y_pos += player.y_velocity * delta_time;
     
@@ -115,6 +188,7 @@ void update_player(float delta_time) {
 }
 
 void render_player(void) {
+    render_trail(); 
     glPushMatrix();
         // Posicionar la avioneta
         glTranslatef(0.0f, player.y_pos, 0.0f);
@@ -126,7 +200,8 @@ void render_player(void) {
         glRotatef(player.rotation, 1.0f, 0.0f, 0.0f);
         
         // Fuselaje principal
-        glColor3f(0.8f, 0.8f, 0.8f);
+        glColor3f(0.0f, 0.0f, 1.0f); // Azul (cambia de 0.8f, 0.8f, 0.8f a 0.0f, 0.0f, 1.0f)
+
         drawScaledCube(BODY_WIDTH, BODY_HEIGHT, BODY_LENGTH);
         
         // Nariz y hélice
@@ -168,18 +243,18 @@ void handle_player_input(unsigned char key) {
     switch(key) {
         case 'w':
         case 'W':
-            player.y_velocity = 10.0f;
+            player.y_velocity = 17.0f;
             break;
         case 's':
         case 'S':
-            player.y_velocity = -10.0f;
+            player.y_velocity = -17.0f;
             break;
-        case ' ': // Tecla espacio
+        case ' ': // Espacio para boost
             player.current_speed = player.boost_speed;
-            player.propeller.speed = 15.0f; // Aumentar velocidad de la hélice
+            player.propeller.speed = 20.0f;
             break;
         case 13: // Enter (acelerador permanente)
-            player.normal_speed += 10.0f;
+            player.normal_speed += 20.0f;
             if(player.normal_speed > player.boost_speed) {
                 player.normal_speed = player.boost_speed;
             }
@@ -192,13 +267,13 @@ void handle_player_key_up(unsigned char key) {
     switch(key) {
         case ' ': // Cuando se suelta el espacio
             player.current_speed = player.normal_speed;
-            player.propeller.speed = 7.0f;
+            player.propeller.speed = 15.0f;
             break;
         case 'w':
         case 'W':
         case 's':
         case 'S':
-            player.y_velocity = 0.0f; // Detener movimiento vertical
+            player.y_velocity = 0.0f;
             break;
     }
 }

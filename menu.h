@@ -8,7 +8,8 @@
 typedef enum {
     STATE_MENU,
     STATE_PLAYING,
-    STATE_PAUSED
+    STATE_PAUSED,
+    STATE_GAME_OVER    // Nuevo estado añadido
 } GameState;
 
 // Opciones del menú
@@ -34,12 +35,11 @@ extern Menu game_menu;
 extern const char* menu_options[4];
 extern GameState current_state;
 
-// Prototipos de funciones del menú
+// Prototipos de funciones
 void init_menu(void);
 void update_menu(void);
 void render_menu(void);
 void menu_handle_input(unsigned char key);
 void menu_handle_special_keys(int key);
-void render_text(const char* text, float y, bool selected);
 
 #endif // MENU_H

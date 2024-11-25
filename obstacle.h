@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <math.h>
 
-#define MAX_OBSTACLES 10
+#define MAX_OBSTACLES 200
 
 typedef struct {
     float x;          // Posición X

@@ -5,7 +5,7 @@ ObstacleSystem obstacle_system;
 
 void init_obstacles(void) {
     obstacle_system.spawn_timer = 0.0f;
-    obstacle_system.spawn_interval = 3.0f;
+    obstacle_system.spawn_interval = 1.0f;
     obstacle_system.speed = 30.0f;  // Esta será la velocidad base
     obstacle_system.active_count = 0;
 

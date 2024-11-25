@@ -1,3 +1,9 @@
+/*COMO COMPILARLO:
+ABRIR TERMINAL: 
+cd /archivos/Proyecto/src/ 
+coloca: gcc -Wall -framework OpenGL -framework GLUT menu.c player.c obstacle.c main.c -o game
+*/
+
 #include "config.h"
 #include "menu.h"
 #include "player.h"
@@ -6,14 +12,13 @@
 #include <stdbool.h>
 #include <math.h> 
 
-
-// gcc -Wall -framework OpenGL -framework GLUT menu.c player.c obstacle.c main.c -o game
-
 // Constantes
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 600
 #define WINDOW_TITLE "MI VIDEOJUEGO"
 #define FPS 60
+#define POINTS_PER_SECOND 100  // Aumentado de 10 a 100
+#define POINTS_FOR_BOOST 50    // Aumentado de 5 a 50
 
 // Variables globales
 int window_id;
@@ -21,8 +26,10 @@ GameState current_state = STATE_MENU;
 bool running = true;
 float delta_time = 0.0f;
 int last_time = 0;
+int score = 0; 
 
-int score = 0;  // Variable para almacenar la puntuación
+// Con las variables globales
+int high_score = 0;
 
 // Prototipos de funciones
 void init(void);
@@ -35,6 +42,7 @@ void cleanup(void);
 void timer(int value);
 void render_game(void);
 void keyboard_up(unsigned char key, int x, int y);
+void render_game_over(void);
 
 // Función de inicialización
 void init(void) {
@@ -65,64 +73,156 @@ void init(void) {
 
 // Función de actualización
 void update(void) {
-    // Calcular delta time
     int current_time = glutGet(GLUT_ELAPSED_TIME);
     delta_time = (current_time - last_time) / 1000.0f;
     last_time = current_time;
 
-    // Incrementar la puntuación
-    if (current_state == STATE_PLAYING) {
-        score += (int)(delta_time * 10);  // Incrementa 10 puntos por segundo
-    }
-
-    // Actualizar según el estado
     switch(current_state) {
         case STATE_MENU:
             update_menu();
             break;
-
+            
         case STATE_PLAYING:
             update_player(delta_time);
             update_obstacles(delta_time);
-            // Verificar colisiones
+            
+            score += (int)(delta_time * POINTS_PER_SECOND);
+            if (player.current_speed > player.normal_speed) {
+                score += (int)(delta_time * POINTS_FOR_BOOST);
+            }
+            
             if (check_collision(0.0f, player.y_pos, 2.0f)) {
-                printf("¡Colisión detectada!\n");
-                // TODO: Manejar colisión
+                printf("¡Colisión detectada! Puntuación final: %d\n", score);
+                if (score > high_score) {
+                    high_score = score;
+                }
+                current_state = STATE_GAME_OVER;
             }
             break;
-
+            
         case STATE_PAUSED:
-            // No actualizar durante pausa
+            break;
+
+        case STATE_GAME_OVER:
+            // No actualizar nada en game over
             break;
     }
 }
 
 // Función para renderizar el juego
 void render_game(void) {
+    glPushMatrix();
+    
+    // Vista del juego
     glLoadIdentity();
+    gluLookAt(0.0f, 0.0f, 70.0f,
+              20.0f, 0.0f, 0.0f,
+              0.0f, 1.0f, 0.0f);
 
-    // Cambiar la vista para que mire desde el lado
-    gluLookAt(0.0f, 0.0f, 70.0f,    // Posición de la cámara (ahora en Z)
-              20.0f, 0.0f, 0.0f,      // Punto al que mira (centro)
-              0.0f, 1.0f, 0.0f);     // Vector "arriba"
-
-    // Renderizar obstáculos
     render_obstacles();
-
-    // Renderizar avioneta
     render_player();
 
-    // Renderizar puntuación
-    glColor3f(1.0f, 1.0f, 1.0f); // Color blanco para el texto
-    char score_text[20];
-    sprintf(score_text, "Score: %d", score);
-    float text_length = (float)glutBitmapLength(GLUT_BITMAP_HELVETICA_18, (const unsigned char*)score_text);
-    glRasterPos2f(-15.0f + text_length / 2000.0f, 20.1f); // Ajusta aquí para mover el texto más arriba
+    // Configurar vista para HUD
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(-1.0, 1.0, -1.0, 1.0);
+    
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
 
+    // Renderizar puntuación
+    // En la parte donde se renderiza el score
+    glColor3f(1.0f, 1.0f, 1.0f);
+    char score_text[32];
+    sprintf(score_text, "Score: %d  High Score: %d", score, high_score);
+    glRasterPos2f(-0.9f, 0.85f);  // Ajustado ligeramente la posición
+    
     const char* text = score_text;
     while (*text) {
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text++);
     }
+
+    // Restaurar matrices
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
+}
+
+void render_game_over(void) {
+    // Primero renderizar el juego en el fondo
+    render_game();
+    
+    // Ahora superponer la pantalla de Game Over
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(-1.0, 1.0, -1.0, 1.0);
+    
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    
+    // Fondo semi-transparente negro
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4f(0.0f, 0.0f, 0.0f, 0.7f);  // El último valor (0.7f) controla la transparencia
+    glBegin(GL_QUADS);
+        glVertex2f(-1.0f, -1.0f);
+        glVertex2f( 1.0f, -1.0f);
+        glVertex2f( 1.0f,  1.0f);
+        glVertex2f(-1.0f,  1.0f);
+    glEnd();
+    
+    // Título "GAME OVER" grande
+    glColor3f(1.0f, 0.0f, 0.0f);  // Rojo
+    const char* game_over_text = "GAME OVER";
+    glRasterPos2f(-0.4f, 0.6f);
+    while (*game_over_text) {
+        glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, *game_over_text++);
+    }
+    
+    // Estadísticas
+    glColor3f(1.0f, 1.0f, 1.0f);  // Blanco
+    char stats_text[128];
+    
+    // Puntuación final
+    sprintf(stats_text, "Final Score: %d", score);
+    glRasterPos2f(-0.3f, 0.3f);
+    const char* text = stats_text;
+    while (*text) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text++);
+    }
+    
+    // High Score
+    sprintf(stats_text, "High Score: %d", high_score);
+    glRasterPos2f(-0.3f, 0.2f);
+    text = stats_text;
+    while (*text) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text++);
+    }
+    
+    // Instrucciones
+    glColor3f(0.7f, 0.7f, 1.0f);  // Azul claro
+    const char* restart_text = "Press ENTER to Play Again";
+    glRasterPos2f(-0.3f, -0.2f);
+    text = restart_text;
+    while (*text) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text++);
+    }
+    
+    const char* menu_text = "Press ESC for Main Menu";
+    glRasterPos2f(-0.3f, -0.3f);
+    text = menu_text;
+    while (*text) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text++);
+    }
+    
+    glDisable(GL_BLEND);
+    
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
 }
 
 // Función de renderizado
@@ -167,6 +267,9 @@ void display(void) {
             glPopMatrix();
             glMatrixMode(GL_MODELVIEW);
             break;
+        case STATE_GAME_OVER:
+            render_game_over();
+            break;
     }
     
     glutSwapBuffers();
@@ -206,6 +309,20 @@ void keyboard(unsigned char key, int x, int y) {
                 current_state = STATE_PLAYING;
             }
             break;
+
+        case STATE_GAME_OVER:
+            if (key == 13) {  // ENTER
+                // Reiniciar juego
+                score = 0;
+                init_player();
+                init_obstacles();
+                current_state = STATE_PLAYING;
+            } else if (key == 27) {  // ESC
+                // Volver al menú
+                score = 0;
+                current_state = STATE_MENU;
+            }
+            break;
     }
     
     glutPostRedisplay();
@@ -230,7 +347,9 @@ void special_keys(int key, int x, int y) {
             break;
             
         case STATE_PAUSED:
-            // No procesar teclas especiales en pausa
+            break;
+
+        case STATE_GAME_OVER:
             break;
     }
     
@@ -275,7 +394,6 @@ int main(int argc, char** argv) {
     // Registrar callbacks
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
-    glutKeyboardFunc(keyboard);
     glutSpecialFunc(special_keys);
     glutTimerFunc(0, timer, 0);
 
